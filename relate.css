@@ -1,0 +1,27 @@
+.video-result {
+  display: flex;
+  margin: 20px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+}
+
+.thumbnail {
+  flex: 0 0 auto;
+  margin-right: 10px;
+}
+
+.thumbnail img {
+  width: 200px;
+  height: 150px;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
+.details p {
+  margin: 5px 0;
+}

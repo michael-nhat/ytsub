@@ -1,0 +1,20 @@
+{
+  "name": "ytsearch.github.io",
+  "version": "1.0.0",
+  "description": "",
+  "main": "apiIndex.js",
+  "scripts": {
+    "start": "pwd ; rsync -av --exclude='.git' --exclude-from='.gitignore' ./ ~/ytsub -I ; cd ~/ytsub && git status && git add . && git commit -m 'update' && git push origin master"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michael-nhat/ytsearch.github.io.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/michael-nhat/ytsearch.github.io/issues"
+  },
+  "homepage": "https://github.com/michael-nhat/ytsearch.github.io#readme"
+}

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Related YouTube Videos</title>
+    <link rel="stylesheet" href="relate.css">
+</head>
+<body>
+    <h1>Related YouTube Videos</h1>
+    <div id="results"></div>
+
+    <script src="parseISO8601Duration.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const videoId = urlParams.get('videoId');
+            const channelId = urlParams.get('channelId');
+            const apiKey = urlParams.get('apiKey');
+            const caption = urlParams.get('caption') || "closedCaption";
+            const maxRelates = urlParams.get('maxRelates') || "5"
+            console.log("maxrelate", maxRelates);
+            const videoDuration = urlParams.get('videoDuration') || "medium";
+            const maxVideos = maxRelates;
+
+            const resultsDiv = document.getElementById('results');
+            const maxNextPages = parseInt(urlParams.get('maxNextPages')) || 2; // Maximum number of next pages to fetch
+
+            if (videoId && channelId) {
+                resultsDiv.innerHTML = 'Error: Only video or channel parameter is permitted, not both.';
+                return;
+            }
+
+            try {
+                if (!apiKey) {
+                    resultsDiv.innerHTML = 'No API key provided.';
+                    return;
+                }
+
+                let apiUrl = '';
+                if (videoId) {
+                  apiUrl = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&relatedToVideo=${videoId}&videoCaption=${caption}&part=snippet&type=video&maxResults=${maxVideos}`;
+                } else if (channelId) {
+                  apiUrl = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${channelId}&videoCaption=${caption}&part=snippet&type=video&maxResults=${maxVideos}&videoDuration=${videoDuration}`;
+                } else {
+                    resultsDiv.innerHTML = 'No video or channel ID provided.';
+                    return;
+                }
+              console.dir(apiUrl);
+
+                let nextPageToken;
+                let videos = [];
+
+                for (let nextPageCount = 0; nextPageCount <= maxNextPages; nextPageCount++) {
+                    const response = await fetch(apiUrl + (nextPageToken ? `&pageToken=${nextPageToken}` : ''));
+                    const data = await response.json();
+                    videos.push(...data.items);
+
+                    nextPageToken = data.nextPageToken;
+
+                    if (!nextPageToken || videos.length >= maxVideos) {
+                        break;
+                    }
+                }
+
+                if (videos.length > 0) {
+                    videos.forEach(async item => {
+                        const videoId = item.id.videoId;
+                        const videoTitle = item.snippet.title;
+                        const videoThumbnail = item.snippet.thumbnails.high.url;
+                        const channelTitle = item.snippet.channelTitle;
+                        const videoDate = new Date(item.snippet.publishedAt).toLocaleDateString();
+
+                        // Fetch additional video details using contentDetails
+                        const detailsResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${videoId}&part=contentDetails`);
+                        const detailsData = await detailsResponse.json();
+                        const videoDuration = parseISO8601Duration(detailsData.items[0].contentDetails.duration);
+
+                        if (!videoId || !videoTitle || !videoThumbnail || !videoDuration) {
+                            console.log(`Missing information for video: ${videoTitle}`);
+                            return;
+                        }
+
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = 'video-result';
+                        resultDiv.innerHTML = `
+                            <div class="thumbnail">
+                                <a href="https://www.youtube.com/watch?v=${videoId}">
+                                    <img src="${videoThumbnail}" alt="${videoTitle}" />
+                                </a>
+                            </div>
+                            <div class="details">
+                                <p><a href="https://www.youtube.com/watch?v=${videoId}">${videoTitle}</a></p>
+                                <p>Channel: <a href="https://www.youtube.com/channel/${item.snippet.channelId}">${channelTitle}</a></p>
+                                <p>Duration: ${videoDuration}</p>
+                                <p>Upload Date: ${videoDate}</p>
+                              <p><a href="relate.html?videoId=${videoId}&apiKey=${apiKey}&maxRelates=${maxRelates}">Related Videos</a></p>
+                                <p><a href="relate.html?channelId=${item.snippet.channelId}&apiKey=${apiKey}&maxRelates=${maxRelates}">Related Channel Videos</a></p>
+                            </div>
+                        `;
+                        resultsDiv.appendChild(resultDiv);
+                    });
+                } else {
+                    resultsDiv.innerHTML = 'No related videos found.';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = 'An error occurred while fetching data.';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Search</title>
+    <link rel="stylesheet" href="index.css">
+  </head>
+
+  <body>
+    <h1 id="header-tag">YouTube Video Search</h1>
+    <h1># 222</h1>
+    <form id="search-form">
+      <label for="search-term">Search for videos:</label>
+      <input type="text" id="search-term" required>
+
+      <div>
+        <label for="video-duration">Video Duration:</label>
+        <select id="video-duration" name="videoDuration">
+          <option value="any">Any</option>
+          <option value="long">Long (20+ minutes)</option>
+          <option value="medium">Medium (4-20 minutes)</option>
+          <option value="short">Short (<4 minutes)</option>
+        </select>
+        <select id="api-list"></select>
+        <input type="hidden" id="api-index" name="apiIndex">
+        <div>
+          <label for="max-relate">max search:</label>
+          <select id="max-search" name="maxSearchValue"></select> <!-- Placeholder for dynamic options -->
+        </div>
+        <div>
+          <label for="max-relate">Max Relate Videos:</label>
+          <select id="max-relate" name="maxRelateValue"></select> <!-- Placeholder for dynamic options -->
+        </div>
+
+      </div>
+
+      <button type="submit">Search</button>
+
+    </form>
+    <form id="search-form-with-link">
+      <label for="search-term-link">Input link video to relate:</label>
+      <input type="text" id="search-term-link" required>
+
+      <div>
+        <label for="max-search-link">Max Search Videos:</label>
+        <select id="max-search-link" name="maxSearchLinkValue"></select> <!-- Placeholder for dynamic options -->
+      </div>
+
+      <button type="submit">Search Link Relate</button>
+
+    </form>
+    <form id="search-form-with-channel">
+      <button id="search-channel">Search channel</button>
+    </form>
+    <div id="results"></div>
+    <div id="pagination">
+      <button id="prev-page">Previous Page</button>
+      <button id="next-page">Next Page</button>
+    </div>
+    <script src="parseISO8601Duration.js"></script>
+    <script src="insertIdBuild.js"></script>
+    <script>
+     document.addEventListener('DOMContentLoaded', async function() {
+       const apiListSelect = document.getElementById('api-list');
+       const apiIndexInput = document.getElementById('api-index');
+       const maxRelateSelect = document.getElementById('max-relate');
+       const maxSearchSelect = document.getElementById('max-search');
+       const maxSearchLinkSelect = document.getElementById('max-search-link');
+       for (let i = 1; i <= 50; i++) {
+         const option = document.createElement('option');
+         option.value = i.toString();
+         option.textContent = i;
+         maxSearchLinkSelect.appendChild(option);
+       }
+       for (let i = 1; i <= 50; i++) {
+         const option = document.createElement('option');
+         option.value = i.toString();
+         option.textContent = i;
+         maxSearchSelect.appendChild(option);
+       }
+       for (let i = 1; i <= 50; i++) {
+         const option = document.createElement('option');
+         option.value = i.toString();
+         option.textContent = i;
+         maxRelateSelect.appendChild(option);
+       }
+       const urlParams = new URLSearchParams(window.location.search);
+       let selectedApiKey = urlParams.get('apiKey');
+       const initialSearchTerm = urlParams.get('searchTerm');
+       const apiStr = urlParams.get('apiStr');
+       const apiIndexs = apiStr.split(",");
+       let selectedApiIndex = -1;
+       for (let i = 0; i < apiIndexs.length; i++) {
+         if (apiIndexs[i] === selectedApiKey) {
+           selectedApiIndex = i;
+           break;
+         }
+       }
+       if (selectedApiIndex === -1) {
+         console.error(`API key not found: ${selectedApiKey}`);
+       } else {
+         apiListSelect.value = selectedApiIndex;
+         apiIndexInput.value = selectedApiIndex;
+       }
+       let apiKey = selectedApiIndex
+
+       var maxRelateSelectCurrent = parseInt(urlParams.get('maxRelates')) || maxRelateSelect.value;
+       var maxSearchSelectCurrent = parseInt(urlParams.get('maxSearches')) || maxSearchSelect.value;
+       const videoDuration = urlParams.get('videoDuration') || "medium";
+       const caption = urlParams.get('caption') || "closedCaption";
+       let selectedVideoDuration = urlParams.get('videoDuration') || "medium";
+       /* const maxRelates = urlParams.get('maxRelates') || "5"; */
+       /* const maxSearches = urlParams.get('maxSearches') || "5"; */
+       const maxNextPages = parseInt(urlParams.get('maxNextPages')) || 2; // Maximum number of next pages to fetch
+
+       const searchForm = document.getElementById('search-form');
+       const searchFormWithLink = document.getElementById('search-form-with-link');
+       const searchTermInput = document.getElementById('search-term');
+       const searchTermLinkInput = document.getElementById('search-term-link');
+       const videoDurationSelect = document.getElementById('video-duration'); // Define videoDurationSelect
+       const resultsDiv = document.getElementById('results');
+       const prevPageButton = document.getElementById('prev-page');
+       const nextPageButton = document.getElementById('next-page');
+       const pageToken = urlParams.get("pageToken") || "";
+       let currentPageToken;
+
+       maxSearchSelect.addEventListener('change', function() {
+         maxSearchSelectCurrent = maxSearchSelect?.value?.toString() || maxSearchSelectCurrent;
+         console.log("maxsearchcurrent", maxSearchSelectCurrent);
+       });
+       maxRelateSelect.addEventListener('change', function() {
+         maxRelateSelectCurrent = maxRelateSelect?.value?.toString() || maxRelateSelectCurrent;
+         console.log("maxrelatecurrent", maxRelateSelectCurrent);
+         const relateOpenElements = document.querySelector("#relate-open");
+         if (relateOpenElements){
+           relateOpenElements.href = relateOpenElements?.href.replace(/maxRelates=\d+/, `maxRelates=${maxRelateSelectCurrent}`);
+         }
+         console.log("relateOpenElements", relateOpenElements);
+         const channelRelateOpenElements = document.querySelector("#channel-relate-open");
+         if (channelRelateOpenElements){
+           channelRelateOpenElements.href= channelRelateOpenElements?.href.replace(/maxRelates=\d+/, `maxRelates=${maxRelateSelectCurrent}`);
+         }
+         console.log("channelRelateOpenElements", channelRelateOpenElements);
+       });
+       videoDurationSelect.addEventListener('change', function() {
+         selectedVideoDuration = videoDurationSelect.value;
+         // replace videoDuration in url
+         const relateOpenElements = document.querySelector("#relate-open");
+         const channelRelateOpenElements = document.querySelector("#channel-relate-open");
+          if (relateOpenElements){
+            relateOpenElements.href = relateOpenElements?.href.replace(/videoDuration=\w+/, `videoDuration=${selectedVideoDuration}`);
+          }
+          if (channelRelateOpenElements){
+            channelRelateOpenElements.href = channelRelateOpenElements?.href.replace(/videoDuration=\w+/, `videoDuration=${selectedVideoDuration}`);
+          }
+         console.log("channelRelateOpenElements duration", channelRelateOpenElements);
+         console.log("relateOpenElements duration", relateOpenElements);
+       });
+       apiIndexInput.addEventListener('change', function() {
+         apiListSelect.value = apiIndexInput.value;
+       });
+       maxRelateSelect.value = maxRelateSelectCurrent
+       maxSearchSelect.value = maxSearchSelectCurrent
+       for (let i = 0; i < videoDurationSelect.options.length; i++) {
+         if (videoDurationSelect.options[i].value === videoDuration) {
+           videoDurationSelect.options[i].selected = true;
+           break;
+         }
+       }
+       apiIndexs.forEach((apiKey, index) => {
+         const option = document.createElement('option');
+         option.value = index;
+         option.textContent = `${index}: ${apiKey}`;
+         apiListSelect.appendChild(option);
+         if (apiKey === selectedApiKey) {
+           apiListSelect.value = index;
+           apiIndexInput.value = index;
+         }
+       });
+       apiListSelect.value = selectedApiIndex;
+       apiIndexInput.value = selectedApiIndex;
+       apiListSelect.addEventListener('change', function() {
+         apiIndexInput.value = apiListSelect.value;
+         // Optionally, you can trigger a search here when the API index changes
+       });
+
+       if (initialSearchTerm) {
+         searchTermInput.value = initialSearchTerm;
+         await performSearch(initialSearchTerm, videoDuration, pageToken);
+       }
+
+       searchFormWithLink.addEventListener('submit', async function(event) {
+         event.preventDefault();
+         const link = searchTermLinkInput.value;
+         // link form : ttps://www.youtube.com/watch?v=eUIMPo2fuy4
+         // or link form : https://youtu.be/eUIMPo2fuy4
+         // check type of link
+         if (link.includes("youtu.be")) {
+           // get linkRelateId from link
+           let linkRelateId = link.split(".be/")[1];
+           // remove other params
+           const ampersandPosition = linkRelateId.indexOf('&');
+           if (ampersandPosition !== -1) {
+             linkRelateId = linkRelateId.substring(0, ampersandPosition);
+           }
+           await performLinkRelateSearch(linkRelateId, selectedVideoDuration, "");
+         } else if (link.includes("youtube.com")) {
+           // get linkRelateId from link
+           let linkRelateId = link.split("v=")[1];
+           // remove other params
+           const ampersandPosition = linkRelateId.indexOf('&');
+           if (ampersandPosition !== -1) {
+             linkRelateId = linkRelateId.substring(0, ampersandPosition);
+           }
+           await performLinkRelateSearch(linkRelateId, selectedVideoDuration, "");
+         } else {
+           resultsDiv.innerHTML = 'Link relate to get is not valid.';
+         }
+       });
+
+       searchForm.addEventListener('submit', async function(event) {
+         event.preventDefault();
+         const searchTerm = searchTermInput.value;
+         await performSearch(searchTerm, selectedVideoDuration, "");
+       });
+       const searchChannelButton = document.getElementById('search-channel');
+        searchChannelButton.addEventListener('click', async function(event) {
+          event.preventDefault();
+          const searchTerm = searchTermInput.value;
+          // search channel then parse all item
+          performSearchChannel(searchTerm, selectedVideoDuration, "");
+
+        });
+
+       prevPageButton.addEventListener('click', async function() {
+         if (currentPageToken) {
+           await performSearch(searchTermInput.value, selectedVideoDuration, currentPageToken);
+         }
+       });
+
+       nextPageButton.addEventListener('click', async function() {
+         if (currentPageToken) {
+           await performSearch(searchTermInput.value, selectedVideoDuration, currentPageToken);
+         }
+       });
+
+       async function performSearchChannel(searchTerm, selectedVideoDuration, pageToken = pageToken) {
+         selectedVideoDuration = videoDurationSelect.value;
+         maxRelateSelectCurrent = maxRelateSelect.value;
+         maxSearchSelectCurrent = maxSearchSelect.value;
+         apiKey = apiIndexs[apiListSelect.value]
+
+         const newUrl = window.location.pathname + `?apiKey=${apiKey}&apiStr=${apiStr}&searchTerm=${encodeURIComponent(searchTerm)}&videoDuration=${selectedVideoDuration}&maxRelates=${maxRelateSelectCurrent}&maxSearches=${maxSearchSelectCurrent}&maxNextPages=${maxNextPages}&pageToken=${pageToken}`;
+         window.history.pushState(null, null, newUrl);
+
+         resultsDiv.innerHTML = '';
+
+         try {
+           const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&q=${encodeURIComponent(searchTerm)}&part=snippet&type=channel&maxResults=${maxSearchSelectCurrent}&pageToken=${pageToken}`; // Updated this line
+           console.dir(url);
+           const response = await fetch(url);
+           const data = await response.json();
+
+           if (data.error) {
+             // Display error message, code, and errors detail
+             resultsDiv.innerHTML = `
+               <p>Error: ${data.error.message}</p>
+               <p>Error Code: ${data.error.code}</p>
+               <p>Errors Detail: ${JSON.stringify(data.error.errors)}</p>
+             `;
+             return;
+           }
+
+           if (data.items.length > 0) {
+             data.items.forEach(async item => {
+               console.log(item);
+               const channelId = item.id.channelId;
+               const channelTitle = item.snippet.title;
+               const channelThumbnail = item.snippet.thumbnails.high.url;
+               const channelDescription = item.snippet.description;
+
+               if (!channelId || !channelTitle || !channelThumbnail || !channelDescription) {
+                 console.log(`Missing information for channel: ${channelTitle}`);
+                 return;
+               }
+
+               const resultDiv = document.createElement('div');
+               resultDiv.className = 'video-result';
+               resultDiv.innerHTML = `
+                 <div class="thumbnail">
+                   <a href="https://www.youtube.com/channel/${channelId}" >
+                     <img src="${channelThumbnail}" alt="${channelTitle}" />
+                   </a>
+                 </div>
+                 <div class="details">
+                   <p><a href="https://www.youtube.com/channel/${channelId}" >${channelTitle}</a></p>
+                    <p>Description: ${channelDescription}</p>
+                    <p><a id=channel-relate-open href="relate.html?maxNextPages=${maxNextPages}&maxRelates=${maxRelateSelectCurrent}&channelId=${channelId}&apiKey=${apiKey}&videoDuration=${selectedVideoDuration}">Related Channel Videos</a></p>
+                  </div>
+                `;
+                resultsDiv.appendChild(resultDiv);
+              });
+  
+              currentPageToken = data.nextPageToken;
+  
+              if (currentPageToken) {
+                nextPageButton.disabled = false;
+              } else {
+                nextPageButton.disabled = true;
+              }
+  
+              if (data.prevPageToken) {
+                prevPageButton.disabled = false;
+              } else {
+                prevPageButton.disabled = true;
+              }
+            } else {
+              resultsDiv.innerHTML = 'No videos found.';
+            }
+          } catch (error) {
+            console.error('Error:', error);
+            resultsDiv.innerHTML = 'An error occurred while fetching data.';
+          }
+        }
+
+       async function performLinkRelateSearch(videoLinkRelateId, selectedVideoDuration, pageToken = pageToken) {
+         try {
+           selectedVideoDuration = videoDurationSelect.value;
+           maxRelateSelectCurrent = maxRelateSelect.value;
+           maxSearchSelectCurrent = maxSearchSelect.value;
+           apiKey = apiIndexs[apiListSelect.value]
+
+           const newLinkRelateUrl = `relate.html?maxNextPages=${maxNextPages}&maxRelates=${maxSearchLinkSelect.value}&videoId=${videoLinkRelateId}&apiKey=${apiKey}`;
+           /* window.history.pushState(null, null, newLinkRelateUrl); */
+
+           //insert link to resultsDiv
+           const linkElement = document.createElement('a');
+           linkElement.href = newLinkRelateUrl;
+           resultsDiv.appendChild(linkElement);
+           linkElement.click();
+         } catch (err) {
+           console.error('Error:', err);
+           resultsDiv.innerHTML = 'An error occurred while fetching data relate link id.';
+         }
+       }
+       async function performSearch(searchTerm, selectedVideoDuration, pageToken = pageToken) {
+         selectedVideoDuration = videoDurationSelect.value;
+         maxRelateSelectCurrent = maxRelateSelect.value;
+         maxSearchSelectCurrent = maxSearchSelect.value;
+         apiKey = apiIndexs[apiListSelect.value]
+
+         const newUrl = window.location.pathname + `?apiKey=${apiKey}&apiStr=${apiStr}&searchTerm=${encodeURIComponent(searchTerm)}&videoDuration=${selectedVideoDuration}&maxRelates=${maxRelateSelectCurrent}&maxSearches=${maxSearchSelectCurrent}&maxNextPages=${maxNextPages}&pageToken=${pageToken}`;
+         window.history.pushState(null, null, newUrl);
+
+         resultsDiv.innerHTML = '';
+
+         try {
+           const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&q=${encodeURIComponent(searchTerm)}&part=snippet&type=video&videoCaption=${caption}&maxResults=${maxSearchSelectCurrent}&videoDuration=${selectedVideoDuration}&pageToken=${pageToken}`; // Updated this line
+           console.dir(url);
+           const response = await fetch(url);
+           const data = await response.json();
+
+           if (data.error) {
+             // Display error message, code, and errors detail
+             resultsDiv.innerHTML = `
+               <p>Error: ${data.error.message}</p>
+               <p>Error Code: ${data.error.code}</p>
+               <p>Errors Detail: ${JSON.stringify(data.error.errors)}</p>
+             `;
+             return;
+           }
+
+           if (data.items.length > 0) {
+             data.items.forEach(async item => {
+               const videoId = item.id.videoId;
+               const videoTitle = item.snippet.title;
+               const videoThumbnail = item.snippet.thumbnails.high.url;
+               const videoChannel = item.snippet.channelTitle;
+
+               let videoViews = "1"
+               // Fetch video statistics using videos endpoint (i commented this code, don't deleted
+               /* const videoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${videoId}&part=statistics`);
+                * const videoData = await videoResponse.json();
+                * videoViews = videoData.items[0]?.statistics.viewCount || 'N/A'; */
+
+               // Fetch additional video details using contentDetails
+               const detailsResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${videoId}&part=contentDetails`);
+               const detailsData = await detailsResponse.json();
+               const videoDuration = parseISO8601Duration(detailsData.items[0].contentDetails.duration);
+
+               if (!videoId || !videoTitle || !videoThumbnail || !videoChannel || !videoViews || !videoDuration) {
+                 console.log(`Missing information for video: ${videoTitle}`);
+                 return;
+               }
+
+               const resultDiv = document.createElement('div');
+               resultDiv.className = 'video-result';
+               resultDiv.innerHTML = `
+                 <div class="thumbnail">
+                   <a href="https://www.youtube.com/watch?v=${videoId}" >
+                     <img src="${videoThumbnail}" alt="${videoTitle}" />
+                   </a>
+                 </div>
+                 <div class="details">
+                   <p><a href="https://www.youtube.com/watch?v=${videoId}" >${videoTitle}</a></p>
+                   <p>Channel: <a href="https://www.youtube.com/channel/${item.snippet.channelId}" >${videoChannel}</a></p>
+                   <p>Views: ${videoViews}</p>
+                   <p>Duration: ${videoDuration}</p>
+                   <p><a id=relate-open href="relate.html?maxNextPages=${maxNextPages}&maxRelates=${maxRelateSelectCurrent}&videoId=${videoId}&apiKey=${apiKey}&searchTerm=${searchTerm}">Relate</a></p>
+                   <p><a id=channel-relate-open href="relate.html?maxNextPages=${maxNextPages}&channelId=${item.snippet.channelId}&apiKey=${apiKey}&videoDuration=${selectedVideoDuration}&maxRelates=${maxRelateSelectCurrent}">Related Channel Videos</a></p>
+                 </div>
+               `;
+               resultsDiv.appendChild(resultDiv);
+             });
+
+             currentPageToken = data.nextPageToken;
+
+             if (currentPageToken) {
+               nextPageButton.disabled = false;
+             } else {
+               nextPageButton.disabled = true;
+             }
+
+             if (data.prevPageToken) {
+               prevPageButton.disabled = false;
+             } else {
+               prevPageButton.disabled = true;
+             }
+           } else {
+             resultsDiv.innerHTML = 'No videos found.';
+           }
+         } catch (error) {
+           console.error('Error:', error);
+           resultsDiv.innerHTML = 'An error occurred while fetching data.';
+         }
+       }
+     });
+    </script>
+  </body>
+
+</html>
