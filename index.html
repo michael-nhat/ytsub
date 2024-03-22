@@ -338,9 +338,9 @@
            window.history.pushState(null, null, newUrl);
 
            /* resultsDiv.innerHTML = ''; */
-           let id = "895A3U8X8PU"
+           /* let id = "895A3U8X8PU" */
 
-           const url = `https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${id || videoLinkRelateId}&part=snippet`; // Updated this line
+           const url = `https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${videoLinkRelateId}&part=snippet`; // Updated this line
            console.dir(url);
            const response = await fetch(url);
            const data = await response.json();
