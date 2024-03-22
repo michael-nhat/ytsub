@@ -332,14 +332,38 @@
            maxSearchSelectCurrent = maxSearchSelect.value;
            apiKey = apiIndexs[apiListSelect.value]
 
-           const newLinkRelateUrl = `relate.html?maxNextPages=${maxNextPages}&maxRelates=${maxSearchLinkSelect.value}&videoId=${videoLinkRelateId}&apiKey=${apiKey}`;
-           /* window.history.pushState(null, null, newLinkRelateUrl); */
+           const newUrl = window.location.pathname + `?apiKey=${apiKey}&apiStr=${apiStr}&videoDuration=${selectedVideoDuration}&maxRelates=${maxRelateSelectCurrent}&maxSearches=${maxSearchSelectCurrent}&maxNextPages=${maxNextPages}&pageToken=${pageToken}`;
+           window.history.pushState(null, null, newUrl);
 
-           //insert link to resultsDiv
-           const linkElement = document.createElement('a');
-           linkElement.href = newLinkRelateUrl;
-           resultsDiv.appendChild(linkElement);
-           linkElement.click();
+         resultsDiv.innerHTML = '';
+           let id = "895A3U8X8PU"
+
+           const url = `https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${id || videoLinkRelateId}&part=snippet`; // Updated this line
+           console.dir(url);
+           const response = await fetch(url);
+           const data = await response.json();
+
+           if (data.error) {
+             // Display error message, code, and errors detail
+             resultsDiv.innerHTML = `
+               <p>Error: ${data.error.message}</p>
+               <p>Error Code: ${data.error.code}</p>
+               <p>Errors Detail: ${JSON.stringify(data.error.errors)}</p>
+             `;
+             return;
+           }
+
+           if (data.items.length > 0) {
+             data.items.forEach(async item => {
+               const channelId = item.snippet.channelId;
+               // https://filmot.com/captionLanguageSearch?channelID=UCrGSFNEBmCN0rqhATZels2Q&sortField=viewcount&sortOrder=desc&minViews=0&maxViews=6000000000&minLikes=0&maxLikes=6000000000&
+               const filmotUrl = `https://filmot.com/captionLanguageSearch?channelID=${channelId}&sortField=viewcount&sortOrder=desc&minViews=0&maxViews=6000000000&minLikes=0&maxLikes=6000000000&`;
+               /* window.location.href = filmotUrl; */
+               window.open(filmotUrl, '_blank').focus();
+
+             });
+           }
+
          } catch (err) {
            console.error('Error:', err);
            resultsDiv.innerHTML = 'An error occurred while fetching data relate link id.';
@@ -374,6 +398,7 @@
 
            if (data.items.length > 0) {
              data.items.forEach(async item => {
+               console.log("item", item);
                const videoId = item.id.videoId;
                const videoTitle = item.snippet.title;
                const videoThumbnail = item.snippet.thumbnails.high.url;
