@@ -335,7 +335,7 @@
            const newUrl = window.location.pathname + `?apiKey=${apiKey}&apiStr=${apiStr}&videoDuration=${selectedVideoDuration}&maxRelates=${maxRelateSelectCurrent}&maxSearches=${maxSearchSelectCurrent}&maxNextPages=${maxNextPages}&pageToken=${pageToken}`;
            window.history.pushState(null, null, newUrl);
 
-         resultsDiv.innerHTML = '';
+           /* resultsDiv.innerHTML = ''; */
            let id = "895A3U8X8PU"
 
            const url = `https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${id || videoLinkRelateId}&part=snippet`; // Updated this line
@@ -400,6 +400,7 @@
              data.items.forEach(async item => {
                console.log("item", item);
                const videoId = item.id.videoId;
+               const channelId = item.id.channelId;
                const videoTitle = item.snippet.title;
                const videoThumbnail = item.snippet.thumbnails.high.url;
                const videoChannel = item.snippet.channelTitle;
@@ -435,6 +436,8 @@
                    <p>Duration: ${videoDuration}</p>
                    <p><a id=relate-open href="relate.html?maxNextPages=${maxNextPages}&maxRelates=${maxRelateSelectCurrent}&videoId=${videoId}&apiKey=${apiKey}&searchTerm=${searchTerm}">Relate</a></p>
                    <p><a id=channel-relate-open href="relate.html?maxNextPages=${maxNextPages}&channelId=${item.snippet.channelId}&apiKey=${apiKey}&videoDuration=${selectedVideoDuration}&maxRelates=${maxRelateSelectCurrent}">Related Channel Videos</a></p>
+                   <p><a id=channel-search-sort-view-open href="https://filmot.com/captionLanguageSearch?channelID=${item.snippet.channelId}&sortField=viewcount&sortOrder=desc&minViews=0&maxViews=6000000000&minLikes=0&maxLikes=6000000000&">Channel videos filmot</a></p>
+
                  </div>
                `;
                resultsDiv.appendChild(resultDiv);
