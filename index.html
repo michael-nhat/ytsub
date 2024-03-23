@@ -338,7 +338,7 @@
            window.history.pushState(null, null, newUrl);
 
            /* resultsDiv.innerHTML = ''; */
-           /* let id = "895A3U8X8PU" */
+           const searchTermLinkInput = document.getElementById('search-term-link').value = "";
 
            const url = `https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${videoLinkRelateId}&part=snippet`; // Updated this line
            console.dir(url);
